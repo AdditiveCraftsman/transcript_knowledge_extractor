@@ -1,0 +1,8 @@
+{
+  "name": "transcript-extractor",
+  "version": "1.0.0",
+  "description": "YouTube transcript extractor for Claude knowledge extraction workflow",
+  "dependencies": {
+    "youtube-transcript": "^1.2.1"
+  }
+}

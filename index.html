@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcript Extractor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --border: #222222;
+      --accent: #e8ff47;
+      --accent-dim: rgba(232, 255, 71, 0.1);
+      --text: #f0f0f0;
+      --muted: #555555;
+      --error: #ff4d4d;
+      --success: #47ff8e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+      position: relative;
+      z-index: 1;
+    }
+
+    header {
+      margin-bottom: 48px;
+    }
+
+    .label {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(32px, 8vw, 52px);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 32px;
+      margin-bottom: 16px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      padding: 14px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="text"]::placeholder {
+      color: var(--muted);
+    }
+
+    button {
+      width: 100%;
+      background: var(--accent);
+      color: #0a0a0a;
+      border: none;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 14px 24px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button:hover { opacity: 0.9; }
+    button:active { transform: scale(0.99); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .status {
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      padding: 10px 0;
+      display: none;
+    }
+
+    .status.visible { display: block; }
+    .status.loading { color: var(--accent); }
+    .status.error { color: var(--error); }
+    .status.success { color: var(--success); }
+
+    /* Loading animation */
+    .status.loading::after {
+      content: '';
+      animation: dots 1.2s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+
+    .result-area {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .result-area.visible { display: flex; }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .result-meta {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    textarea {
+      width: 100%;
+      height: 200px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 16px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      width: 100%;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: var(--accent-dim);
+    }
+
+    .copy-feedback {
+      font-size: 11px;
+      color: var(--success);
+      text-align: center;
+      letter-spacing: 0.05em;
+      height: 16px;
+    }
+
+    .instructions {
+      border: 1px solid var(--border);
+      padding: 20px 24px;
+      background: var(--surface);
+    }
+
+    .instructions p {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.8;
+      letter-spacing: 0.02em;
+    }
+
+    .instructions strong {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .step:last-child { margin-bottom: 0; }
+
+    .step-num {
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      min-width: 20px;
+    }
+
+    footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <div class="label">Knowledge Pipeline</div>
+      <h1>Transcript<br /><span>Extractor</span></h1>
+      <p class="subtitle">Paste a YouTube link → get clean text → paste into Claude for knowledge extraction.</p>
+    </header>
+
+    <div class="card">
+      <div class="input-group">
+        <input
+          type="text"
+          id="urlInput"
+          placeholder="https://www.youtube.com/watch?v=..."
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="none"
+          spellcheck="false"
+        />
+        <button id="extractBtn" onclick="extract()">Extract Transcript</button>
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+
+    <div class="result-area" id="resultArea">
+      <div class="card">
+        <div class="result-header">
+          <div class="label" style="margin-bottom:0">Clean Transcript</div>
+          <div class="result-meta" id="resultMeta"></div>
+        </div>
+        <br />
+        <textarea id="transcriptOutput" readonly></textarea>
+        <br />
+        <div class="action-row">
+          <button class="btn-secondary" onclick="copyToClipboard()">Copy to Clipboard</button>
+          <button class="btn-secondary" onclick="downloadTxt()">Download .txt</button>
+        </div>
+        <div class="copy-feedback" id="copyFeedback"></div>
+      </div>
+    </div>
+
+    <div class="instructions">
+      <div class="step">
+        <span class="step-num">01</span>
+        <p>Paste any YouTube URL above — works with full links and short <strong>youtu.be</strong> links.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">02</span>
+        <p>Hit <strong>Extract</strong> — the transcript is pulled and cleaned automatically, no timestamps.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">03</span>
+        <p><strong>Copy</strong> the text and paste it into Claude for structured knowledge extraction.</p>
+      </div>
+    </div>
+
+    <footer>Built for Claude knowledge workflows</footer>
+
+  </div>
+
+  <script>
+    const API_URL = "/.netlify/functions/get-transcript";
+
+    function setStatus(msg, type) {
+      const el = document.getElementById("status");
+      el.className = `status visible ${type}`;
+      el.textContent = msg;
+    }
+
+    function clearStatus() {
+      const el = document.getElementById("status");
+      el.className = "status";
+      el.textContent = "";
+    }
+
+    async function extract() {
+      const url = document.getElementById("urlInput").value.trim();
+      if (!url) {
+        setStatus("Please paste a YouTube URL first.", "error");
+        return;
+      }
+
+      const btn = document.getElementById("extractBtn");
+      btn.disabled = true;
+      document.getElementById("resultArea").classList.remove("visible");
+      setStatus("Fetching transcript", "loading");
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || "Unknown error");
+        }
+
+        const text = data.transcript;
+        const wordCount = text.split(/\s+/).length.toLocaleString();
+        const charCount = text.length.toLocaleString();
+
+        document.getElementById("transcriptOutput").value = text;
+        document.getElementById("resultMeta").textContent = `${wordCount} words · ${charCount} chars`;
+        document.getElementById("resultArea").classList.add("visible");
+        clearStatus();
+
+      } catch (err) {
+        setStatus(err.message || "Failed to fetch transcript.", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function copyToClipboard() {
+      const text = document.getElementById("transcriptOutput").value;
+      const feedback = document.getElementById("copyFeedback");
+      try {
+        await navigator.clipboard.writeText(text);
+        feedback.textContent = "✓ Copied to clipboard";
+        setTimeout(() => feedback.textContent = "", 2500);
+      } catch {
+        feedback.style.color = "var(--error)";
+        feedback.textContent = "Copy failed — select text manually.";
+      }
+    }
+
+    function downloadTxt() {
+      const text = document.getElementById("transcriptOutput").value;
+      const blob = new Blob([text], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "transcript.txt";
+      a.click();
+    }
+
+    // Allow pressing Enter to trigger extraction
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("urlInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") extract();
+      });
+    });
+  </script>
+</body>
+</html>
